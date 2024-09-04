@@ -1,7 +1,7 @@
-import { View, Text, StyleSheet, TouchableOpacity, Modal } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Modal, Alert } from 'react-native';
 import React, { useState, useEffect } from 'react';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import FormField from '@/components/FormField';
+import FormField from '@/components/FormField'; // Adjust the import path if necessary
 
 const RootLayout = () => {
   const [name, setName] = useState("");
@@ -70,14 +70,14 @@ const RootLayout = () => {
         />
         <FormField
           title="Event Date"
-          value={eventDate}
+          value={eventDate ? eventDate.toDateString() : ""}
           placeholder="Select event date"
           isDate={true}
           onDateChange={setEventDate}
         />
         <FormField
           title="Payment Date"
-          value={paymentDate}
+          value={paymentDate ? paymentDate.toDateString() : ""}
           placeholder="Select payment date"
           isDate={true}
           onDateChange={setPaymentDate}

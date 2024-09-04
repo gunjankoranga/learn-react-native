@@ -1,11 +1,11 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Modal, Image, TouchableOpacity } from 'react-native';
-
-// Interface for the items
+import QuantitySelector from './QuantitySelector'; // Adjust import path as necessary
+import ActionButton from './ActionButton';
 interface Item {
   id: string;
   name: string;
-  image: any; 
+  image: any;
   price: number;
 }
 
@@ -13,52 +13,70 @@ interface AddItemModalProps {
   visible: boolean;
   onClose: () => void;
   items: Item[];
-  onAddItem: (selectedItems: Item[]) => void; // Updated handler for selected items
+  onAddItem: (selectedItems: Item[]) => void;
 }
 
 const AddItemModal: React.FC<AddItemModalProps> = ({ visible, onClose, items, onAddItem }) => {
-  const [selectedItems, setSelectedItems] = useState<Item[]>([]);
+  const [selectedItems, setSelectedItems] = useState<{ [key: string]: { item: Item; quantity: number } }>({});
 
   const handleItemPress = (item: Item) => {
-    setSelectedItems((prevSelected) => {
-      if (prevSelected.some(selectedItem => selectedItem.id === item.id)) {
+    setSelectedItems(prevSelected => {
+      const newSelected = { ...prevSelected };
+      if (newSelected[item.id]) {
         // Item already selected, deselect it
-        return prevSelected.filter(selectedItem => selectedItem.id !== item.id);
+        delete newSelected[item.id];
       } else {
         // Item not selected, add it
-        return [...prevSelected, item];
+        newSelected[item.id] = { item, quantity: 1 };
       }
+      return newSelected;
+    });
+  };
+
+  const handleQuantityChange = (itemId: string, newQuantity: number) => {
+    setSelectedItems(prevSelected => {
+      const newSelected = { ...prevSelected };
+      if (newSelected[itemId]) {
+        newSelected[itemId].quantity = newQuantity;
+      }
+      return newSelected;
     });
   };
 
   const handleAddItems = () => {
-    onAddItem(selectedItems);
-    onClose(); // Close the modal after adding items
+    const itemsToAdd = Object.values(selectedItems).map(({ item, quantity }) => ({
+      ...item,
+      price: item.price * quantity, // Adjust price based on quantity if needed
+      quantity,
+    }));
+    onAddItem(itemsToAdd);
+    onClose();
   };
 
-  const renderItem = (item: Item) => (
-    <TouchableOpacity 
-      key={item.id} 
-      onPress={() => handleItemPress(item)} 
-      style={[
-        styles.itemContainer,
-        selectedItems.some(selectedItem => selectedItem.id === item.id) && styles.itemSelected
-      ]}
-    >
-      <View style={styles.textContainer}>
-        <Text style={styles.itemName}>{item.name}</Text>
-      </View>
+  const renderItem = (item: Item) => {
+    const isSelected = !!selectedItems[item.id];
+    return (
+      <TouchableOpacity
+        key={item.id}
+        onPress={() => handleItemPress(item)}
+        style={[styles.itemContainer, isSelected && styles.itemSelected]}
+      >
+        <Image source={item.image} style={styles.itemImage} />
+        <View style={styles.textContainer}>
+          <Text style={styles.itemName}>{item.name}</Text>
+          <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
+          {isSelected && (
+            <QuantitySelector
+              itemId={item.id}
+              quantity={selectedItems[item.id]?.quantity || 1}
+              onQuantityChange={handleQuantityChange}
+            />
+          )}
+        </View>
+      </TouchableOpacity>
+    );
+  };
 
-      <Image source={item.image} style={styles.itemImage} />
-
-      <View style={styles.textContainer}>
-      
-        <Text style={styles.itemName}>{item.price}</Text>
-      </View>
-    </TouchableOpacity>
-  );
-
-  // Group items by row count (3 items per row)
   const rows = [];
   for (let i = 0; i < items.length; i += 3) {
     rows.push(items.slice(i, i + 3));
@@ -81,27 +99,16 @@ const AddItemModal: React.FC<AddItemModalProps> = ({ visible, onClose, items, on
               {rows.map((row, rowIndex) => (
                 <View key={rowIndex} style={styles.row}>
                   {row.map(item => renderItem(item))}
-                  {row.length < 3 && (
-                    <View style={[styles.itemContainer, styles.placeholderContainer]}>
-                      <Text style={styles.itemName}> </Text>
-                    </View>
-                  )}
                 </View>
               ))}
             </View>
             <View style={styles.buttonContainer}>
-              <TouchableOpacity 
-                style={[
-                  styles.addButton, 
-                  { backgroundColor: selectedItems.length > 0 ? 'yellow' : 'gray' }
-                ]} 
+              <ActionButton
+                label={`ADD ${Object.keys(selectedItems).length} ITEM${Object.keys(selectedItems).length > 1 ? 'S' : ''}`}
                 onPress={handleAddItems}
-                disabled={selectedItems.length === 0}
-              >
-                <Text style={styles.addButtonText}>
-                  {selectedItems.length > 0 ? `ADD ${selectedItems.length} ITEM${selectedItems.length > 1 ? 'S' : ''}` : 'ADD ITEMS'}
-                </Text>
-              </TouchableOpacity>
+                enabled={Object.keys(selectedItems).length > 0}
+                variant="modal"
+              />
             </View>
           </View>
         </View>
@@ -118,22 +125,14 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0, 0, 0, 0.5)', // Semi-transparent background
   },
   modalContent: {
-    width: '100%',
+    width: '90%',
     backgroundColor: '#FFF',
     padding: 20,
     borderRadius: 10,
     alignItems: 'center',
-    borderWidth: 1,
-    borderColor: '#ddd',
   },
   gridContainer: {
     width: '100%',
-    borderWidth: 0.9,
-    borderColor: '#000',
-    position: 'relative',
-    paddingBottom: 10,
-    paddingLeft:20,
-    paddingRight:20,
   },
   header: {
     width: '100%',
@@ -141,12 +140,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 10,
-    paddingHorizontal: 10,
   },
   headerTitle: {
     fontSize: 15,
     fontWeight: '400',
-    color: '#000',
   },
   itemsContainer: {
     width: '100%',
@@ -159,17 +156,14 @@ const styles = StyleSheet.create({
   itemContainer: {
     alignItems: 'center',
     width: '30%',
-    padding: 10,
-    borderWidth: 0.8,
+    borderWidth: 1,
     borderColor: '#000',
-    margin: 3,
     backgroundColor: '#FFF',
+    padding: 10,
+    borderRadius: 5,
   },
   itemSelected: {
-    backgroundColor: 'yellow', // Highlight selected items
-  },
-  placeholderContainer: {
-    borderColor: 'transparent',
+    borderColor: 'yellow', // Highlight selected items
   },
   itemImage: {
     width: 70,
@@ -184,21 +178,16 @@ const styles = StyleSheet.create({
     fontSize: 14,
     textAlign: 'center',
     marginTop: 2,
+    marginBottom: 2,
   },
-  addButton: {
-    padding: 10,
-    borderRadius: 5,
-    alignItems: 'center',
-    
-  },
-  addButtonText: {
-    color: '#000',
-    fontWeight: 'bold',
+  itemPrice: {
+    fontSize: 14,
+    textAlign: 'center',
+    marginBottom: 5,
   },
   buttonContainer: {
-    marginTop: 20,
     alignItems: 'flex-end',
-    paddingHorizontal: 10,
+    marginTop: 20,
   },
 });
 
